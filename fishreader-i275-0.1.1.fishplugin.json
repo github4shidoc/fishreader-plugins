@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "plugin:i275:audio",
+    "name": "275听书",
+    "version": "0.1.1",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": [
+      "source"
+    ],
+    "entryModule": "main.js",
+    "entrypoints": [
+      "search",
+      "exploreMenu",
+      "explore",
+      "detail",
+      "catalog",
+      "content"
+    ],
+    "permissions": {
+      "networkDomains": [
+        "m.i275.com",
+        "i275.com",
+        "2025.tingshijie.com",
+        "audiopay.cos.tx.xmcdn.com"
+      ],
+      "redirectDomains": [
+        "m.i275.com",
+        "i275.com",
+        "2025.tingshijie.com",
+        "audiopay.cos.tx.xmcdn.com"
+      ],
+      "cookieScope": true,
+      "pluginStorage": false,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "275听书有声内容插件；支持检索、最近上架、详情、完整选集和单集音频解析。"
+  },
+  "source": "\"use strict\";var U=Object.defineProperty;var M=Object.getOwnPropertyDescriptor;var I=Object.getOwnPropertyNames;var K=Object.prototype.hasOwnProperty;var P=(t,e)=>{for(var n in e)U(t,n,{get:e[n],enumerable:!0})},N=(t,e,n,r)=>{if(e&&typeof e==\"object\"||typeof e==\"function\")for(let o of I(e))!K.call(t,o)&&o!==n&&U(t,o,{get:()=>e[o],enumerable:!(r=M(e,o))||r.enumerable});return t};var v=t=>N(U({},\"__esModule\",{value:!0}),t);var Q={};P(Q,{catalog:()=>V,content:()=>J,detail:()=>F,explore:()=>D,exploreMenu:()=>z,search:()=>W});module.exports=v(Q);var l=\"https://m.i275.com\",E=\"Mozilla/5.0 (Linux; Android 12; Mobile) AppleWebKit/537.36 Chrome/126.0.0.0 Mobile Safari/537.36\";function h(t){return String(t??\"\")}function m(t){return _(H(h(t))).replace(/\\s+/g,\" \").trim()}function H(t){return h(t).replace(/<br\\s*\\/?>/gi,`\n`).replace(/<[^>]*>/g,\" \")}function _(t){let e={amp:\"&\",lt:\"<\",gt:\">\",quot:'\"',apos:\"'\",nbsp:\" \",ndash:\"\\u2013\",mdash:\"\\u2014\",hellip:\"\\u2026\",middot:\"\\xB7\"};return h(t).replace(/&(#x?[0-9a-f]+|[a-z]+);/gi,(n,r)=>{let o=String(r).toLowerCase();if(o[0]===\"#\"){let s=o[1]===\"x\",a=Number.parseInt(o.slice(s?2:1),s?16:10);if(Number.isFinite(a)&&a>=0&&a<=1114111)try{return String.fromCodePoint(a)}catch{return n}return n}return Object.prototype.hasOwnProperty.call(e,o)?e[o]:n})}function O(t){return h(t).replace(/[.*+?^${}()|[\\]\\\\]/g,\"\\\\$&\")}function $(t){let e=m(t);if(!e)return\"\";if(/^https?:\\/\\//i.test(e))return e;if(e.startsWith(\"//\"))return`https:${e}`;if(e.startsWith(\"/\"))return`${l}${e}`;try{return new URL(e,l).toString()}catch{return\"\"}}function T(t){return`i275:book:${String(t)}`}function q(t,e){return`i275:book:${String(t)}:episode:${String(e)}`}function b(t){return`${l}/book/${encodeURIComponent(String(t))}.html`}function A(t,e){return`${l}/play/${encodeURIComponent(String(t))}/${encodeURIComponent(String(e))}.html`}function R(t){let e=[t?.bookKey,t?.bookUrl,t?.tocUrl,t?.chapterKey,t?.chapterUrl];for(let n of e){let r=h(n),o=r.match(/i275:book:(\\d+)/i);if(o)return o[1];let s=r.match(/\\/(?:book|play)\\/(\\d+)(?:[/.]|$)/i);if(s)return s[1]}throw new Error(\"\\u65E0\\u6CD5\\u8BC6\\u522B 275\\u542C\\u4E66\\u4F5C\\u54C1\\u7F16\\u53F7\")}function B(t){let e=[t?.chapterKey,t?.chapterUrl];for(let n of e){let r=h(n),o=r.match(/:episode:(\\d+)/i);if(o)return o[1];let s=r.match(/\\/play\\/\\d+\\/(\\d+)\\.html/i);if(s)return s[1]}throw new Error(\"\\u65E0\\u6CD5\\u8BC6\\u522B 275\\u542C\\u4E66\\u5206\\u96C6\\u7F16\\u53F7\")}function L(t=`${l}/`){return{Accept:\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\",Referer:t,\"User-Agent\":E}}async function X(t,e){try{let n=await reader.http.fetch({url:t,method:\"HEAD\",headers:{Accept:\"audio/*,*/*;q=0.8\",Referer:e,\"User-Agent\":E},charset:\"iso-8859-1\"});return Number(n?.status||0)}catch{return 0}}async function g(t,e=`${l}/`){let n=await reader.http.fetch({url:t,method:\"GET\",headers:L(e),charset:\"utf-8\"}),r=Number(n?.status||0),o=h(n?.body);if(r<200||r>=300)throw new Error(`275\\u542C\\u4E66\\u8BF7\\u6C42\\u5931\\u8D25\\uFF1AHTTP ${r}`);if(/Forbidden:\\s*Crawler detected/i.test(o))throw new Error(\"275\\u542C\\u4E66\\u9650\\u5236\\u4E86\\u8FC7\\u5FEB\\u8BBF\\u95EE\\uFF0C\\u8BF7\\u7A0D\\u540E\\u91CD\\u8BD5\");return{body:o,url:$(n?.url||t)||t}}function i(t,e,n=1){let r=h(t).match(e);return r?m(r[n]):\"\"}function w(t,e){let n=O(e),r=[new RegExp(`${n}[\\uFF1A:]\\\\s*<span[^>]*>([\\\\s\\\\S]*?)<\\\\/span>`,\"i\"),new RegExp(`<span[^>]*>\\\\s*${n}\\\\s*<\\\\/span>([\\\\s\\\\S]*?)(?=<\\\\/p>)`,\"i\"),new RegExp(`${n}[\\uFF1A:]\\\\s*([^<\\\\n]+)`,\"i\")];for(let o of r){let s=i(t,o);if(s)return s}return\"\"}function C(t){let e=[],n=new Set,r=/<a\\b[^>]*href=[\"'](\\/book\\/(\\d+)\\.html)[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi,o;for(;(o=r.exec(h(t)))!==null&&e.length<500;){let s=o[2];if(n.has(s))continue;let a=o[3],c=i(a,/<h3\\b[^>]*>([\\s\\S]*?)<\\/h3>/i)||i(a,/<img\\b[^>]*\\balt=[\"']([^\"']*)[\"']/i)||i(a,/<div\\b[^>]*class=[\"'][^\"']*font-medium[^\"']*[\"'][^>]*>([\\s\\S]*?)<\\/div>/i);if(!c)continue;let p=$(i(a,/<img\\b[^>]*\\bsrc=[\"']([^\"']+)[\"']/i)),u=w(a,\"\\u6F14\\u64AD\"),d=w(a,\"\\u4F5C\\u8005\"),f=[],x=/<p\\b[^>]*>([\\s\\S]*?)<\\/p>/gi,y;for(;(y=x.exec(a))!==null;){let k=m(y[1]);k&&!/^(演播|作者)/.test(k)&&f.push(k)}let S=[];d&&S.push(`\\u4F5C\\u8005\\uFF1A${d}`),u&&S.push(`\\u6F14\\u64AD\\uFF1A${u}`),f.length>0&&S.push(f[f.length-1]),n.add(s),e.push({bookKey:T(s),title:c,author:d&&d!==\"\\u4F5A\\u540D\"?d:u,intro:S.join(`\n`),coverUrl:p,bookUrl:b(s),latestChapter:\"\",types:[\"\\u6709\\u58F0\"],publicationStatus:\"\",mediaType:\"audiobook\"})}return e}function j(t,e){let n=i(t,/<h1\\b[^>]*class=[\"'][^\"']*text-2xl[^\"']*[\"'][^>]*>([\\s\\S]*?)<\\/h1>/i)||i(t,/<title>([\\s\\S]*?)(?:\\s+-\\s+[^<]*)?<\\/title>/i);if(!n)throw new Error(\"275\\u542C\\u4E66\\u8BE6\\u60C5\\u7F3A\\u5C11\\u4F5C\\u54C1\\u540D\\u79F0\");let r=w(t,\"\\u4F5C\\u8005\"),o=w(t,\"\\u6F14\\u64AD\"),s=w(t,\"\\u72B6\\u6001\"),a=$(i(t,/<div\\b[^>]*class=[\"'][^\"']*(?:w-32|md:w-48)[^\"']*[\"'][^>]*>[\\s\\S]*?<img\\b[^>]*\\bsrc=[\"']([^\"']+)[\"']/i)),c=i(t,/<h3\\b[^>]*>\\s*作品简介\\s*<\\/h3>[\\s\\S]*?<p\\b[^>]*>([\\s\\S]*?)<\\/p>/i)||i(t,/<meta\\b[^>]*\\bname=[\"']description[\"'][^>]*\\bcontent=[\"']([^\"']*)[\"']/i),p=Number(i(t,/正文目录\\s*[（(]\\s*([\\d,]+)\\s*[)）]/i).replace(/,/g,\"\"))||0,u=[];return r&&u.push(`\\u4F5C\\u8005\\uFF1A${r}`),o&&u.push(`\\u6F14\\u64AD\\uFF1A${o}`),c&&u.push(c),{bookKey:T(e),title:n,author:r&&r!==\"\\u4F5A\\u540D\"?r:o,intro:u.join(`\n`),coverUrl:a,bookUrl:b(e),tocUrl:`${b(e)}#chapters`,latestChapter:p>0?`\\u5171 ${p} \\u96C6`:\"\",chapterCount:p,types:[\"\\u6709\\u58F0\"],publicationStatus:s,mediaType:\"audiobook\",canReName:!1,downloadUrls:[]}}function G(t,e){let n=[],r=new Set,o=/<a\\b[^>]*href=[\"']\\/play\\/(\\d+)\\/(\\d+)\\.html[\"'][^>]*>([\\s\\S]*?)<\\/a>/gi,s;for(;(s=o.exec(h(t)))!==null&&n.length<2e4;){let a=s[1],c=s[2];if(a!==String(e)||r.has(c))continue;let p=s[3],u=[],d=/<span\\b[^>]*>([\\s\\S]*?)<\\/span>/gi,f;for(;(f=d.exec(p))!==null;){let y=m(f[1]);y&&u.push(y)}if(u.length===0)continue;let x=u[u.length-1];r.add(c),n.push({chapterKey:q(a,c),title:x,ordinal:n.length,chapterUrl:A(a,c),isVolume:!1,isLocked:!1,mediaType:\"audiobook\"})}return n}var W=async function(t){let e=m(t?.keyword);if(!e)return[];if(Math.max(1,Number(t?.page||1))>1)return[];let n=await g(`${l}/search.php?q=${encodeURIComponent(e)}`);return C(n.body)},z=async function(){return[{key:\"latest\",title:\"\\u6700\\u8FD1\\u4E0A\\u67B6\",group:\"\\u63A8\\u8350\"}]},D=async function(t){if(Math.max(1,Number(t?.page||1))>1)return[];let e=await g(`${l}/`);return C(e.body)},F=async function(t){let e=R(t||{}),n=await g(b(e));return j(n.body,e)},V=async function(t){let e=R(t||{}),n=await g(b(e)),r=G(n.body,e);if(r.length===0)throw new Error(\"275\\u542C\\u4E66\\u672A\\u8FD4\\u56DE\\u53EF\\u7528\\u9009\\u96C6\");return r},J=async function(t){let e=R(t||{}),n=B(t||{}),r=A(e,n),o=0,s=\"\";for(let a=0;a<5;a+=1){a>0&&(await reader.cookie.clear(l),await g(`${l}/`));let c=await g(r,b(e));s=i(c.body,/<title>([\\s\\S]*?)<\\/title>/i);let p=$(i(c.body,/\\burl\\s*:\\s*[\"']([^\"']+)[\"']/i));if(/^https?:\\/\\//i.test(p)&&(o=await X(p,r),o===200||o===206||o===405))return{contentType:\"audio\",content:\"\",mediaUrl:p,mediaHeaders:{Referer:r,\"User-Agent\":E},title:m(t?.title)||i(c.body,/<h1\\b[^>]*>([\\s\\S]*?)<\\/h1>/i)||`\\u7B2C ${n} \\u96C6`,message:\"275\\u542C\\u4E66\\u97F3\\u9891\"}}throw new Error(`\\u5F53\\u524D\\u5206\\u96C6\\u5A92\\u4F53\\u670D\\u52A1\\u5668\\u4E0D\\u53EF\\u7528${o?`\\uFF08HTTP ${o}\\uFF09`:\"\"}${s?`\\uFF1A${s}`:\"\"}`)};\n"
+}

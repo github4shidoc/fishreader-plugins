@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "org.fishreader.dictionary.youdao.en.zh",
+    "name": "有道英译中词典",
+    "version": "1.0.0",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": [
+      "dictionary"
+    ],
+    "entryModule": "main.js",
+    "entrypoints": [
+      "dictionary"
+    ],
+    "permissions": {
+      "networkDomains": [
+        "dict.youdao.com"
+      ],
+      "redirectDomains": [],
+      "cookieScope": false,
+      "pluginStorage": false,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "在线查询英文单词和短语，提供音标、中文释义与词形变化。"
+  },
+  "source": "'use strict';\n\nfunction plainText(value) {\n  const named = { amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\", nbsp: ' ' };\n  return String(value || '')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/?[a-z][a-z0-9]*(?:\\s[^>]*)?>/gi, ' ')\n    .replace(/&#(x[0-9a-f]+|[0-9]+);?/gi, function (_, code) {\n      const number = code.charAt(0).toLowerCase() === 'x' ?\n        parseInt(code.slice(1), 16) : parseInt(code, 10);\n      if (!Number.isFinite(number) || number < 0 || number > 0x10ffff) return '';\n      try { return String.fromCodePoint(number); } catch (_) { return ''; }\n    })\n    .replace(/&([a-z]+);/gi, function (match, name) {\n      return Object.prototype.hasOwnProperty.call(named, name.toLowerCase()) ?\n        named[name.toLowerCase()] : match;\n    })\n    .replace(/[\\t\\r\\n ]+/g, ' ')\n    .replace(/([“‘（【《〈])\\s+/g, '$1')\n    .replace(/\\s+([”’）】》〉，。！？；：、])/g, '$1')\n    .trim();\n}\n\nfunction normalizeTerm(value) {\n  const selected = String(value || '').trim();\n  const match = selected.match(/[A-Za-z][A-Za-z'’ -]{0,79}/);\n  return match ? match[0].replace(/’/g, \"'\").trim() : '';\n}\n\nfunction asArray(value) {\n  return Array.isArray(value) ? value : [];\n}\n\nfunction firstWord(data) {\n  const ecWords = data && data.ec && asArray(data.ec.word);\n  if (ecWords && ecWords.length > 0) return ecWords[0] || {};\n  const simpleWords = data && data.simple && asArray(data.simple.word);\n  return simpleWords && simpleWords.length > 0 ? simpleWords[0] || {} : {};\n}\n\nfunction collectTranslations(word) {\n  const output = [];\n  asArray(word && word.trs).forEach(function (translationGroup) {\n    asArray(translationGroup && translationGroup.tr).forEach(function (translation) {\n      const items = translation && translation.l && translation.l.i;\n      const values = Array.isArray(items) ? items : (items ? [items] : []);\n      values.forEach(function (item) {\n        const text = plainText(item).slice(0, 12000);\n        if (text && output.indexOf(text) < 0 && output.length < 12) output.push(text);\n      });\n    });\n  });\n  return output;\n}\n\nfunction collectForms(word) {\n  const output = [];\n  asArray(word && word.wfs).forEach(function (entry) {\n    const form = entry && entry.wf;\n    const name = plainText(form && form.name);\n    const value = plainText(form && form.value);\n    if (name && value && output.length < 12) output.push(name + '：' + value);\n  });\n  return output;\n}\n\nmodule.exports.dictionary = async function (input) {\n  const value = input || {};\n  const term = normalizeTerm(value.word || value.context);\n  if (!term) {\n    return { title: '有道英译中词典', text: '请选择要查询的英文单词或短语。' };\n  }\n\n  try {\n    const response = await Promise.resolve(reader.http.fetch({\n      url: 'https://dict.youdao.com/jsonapi?q=' + encodeURIComponent(term),\n      method: 'GET',\n      headers: {\n        'Accept': 'application/json,text/plain,*/*',\n        'Referer': 'https://dict.youdao.com/',\n        'User-Agent': 'Mozilla/5.0 FishReaderDictionary/1.0'\n      },\n      timeoutMs: 15000\n    }));\n    const status = Number(response && response.status || 0);\n    const body = String(response && response.body || '');\n    if (status < 200 || status >= 400 || !body) {\n      return { title: term + ' · 有道英译中词典', text: '查询失败：HTTP ' + status + '。' };\n    }\n\n    let data;\n    try { data = JSON.parse(body); } catch (_) {\n      return { title: term + ' · 有道英译中词典', text: '查询失败：返回内容不是有效的词典数据。' };\n    }\n    const word = firstWord(data);\n    const translations = collectTranslations(word);\n    if (translations.length === 0) {\n      return { title: term + ' · 有道英译中词典', text: '暂未收录该英文单词或短语。' };\n    }\n\n    const lines = [];\n    const ukPhone = plainText(word.ukphone);\n    const usPhone = plainText(word.usphone);\n    const phones = [];\n    if (ukPhone) phones.push('英 /' + ukPhone + '/');\n    if (usPhone && usPhone !== ukPhone) phones.push('美 /' + usPhone + '/');\n    if (phones.length > 0) lines.push(phones.join('　'));\n    if (lines.length > 0) lines.push('');\n    translations.forEach(function (translation, index) {\n      lines.push(String(index + 1) + '. ' + translation);\n    });\n    const forms = collectForms(word);\n    if (forms.length > 0) lines.push('', '词形：' + forms.join('；'));\n    lines.push('', '数据：有道词典（在线查询）');\n    return { title: term + ' · 有道英译中词典', text: lines.join('\\n') };\n  } catch (error) {\n    const message = (error && error.message ? String(error.message) :\n      String(error || '未知错误')).slice(0, 500);\n    return { title: term + ' · 有道英译中词典', text: '查询失败：' + message };\n  }\n};\n"
+}

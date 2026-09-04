@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "org.fishreader.template.tts",
+    "name": "FishReader TTS 模板",
+    "version": "0.1.1",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": [
+      "tts"
+    ],
+    "entryModule": "main.js",
+    "managementModule": "manage.html",
+    "entrypoints": [
+      "ttsVoices",
+      "ttsSynthesize",
+      "ui"
+    ],
+    "permissions": {
+      "networkDomains": [],
+      "redirectDomains": [],
+      "cookieScope": false,
+      "pluginStorage": true,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "可配置 URL、方法、请求头和正文模板的 TTS 插件开发模板。"
+  },
+  "source": "'use strict';\n\nconst CONFIG_KEY = 'tts.config';\n\nfunction text(value) {\n  return typeof value === 'string' ? value : '';\n}\n\nfunction replacementValue(name, input) {\n  if (/^voiceKey$/i.test(name)) return text(input.voiceKey);\n  if (/^(?:speed|speakSpeed)$/i.test(name)) return String(input.speed);\n  return text(input.text);\n}\n\nfunction replace(template, input, encode) {\n  return text(template)\n    .replace(/\\{\\{\\s*(?:java\\.)?(?:encodeURI|encodeURIComponent)\\s*\\(\\s*(text|speakText|voiceKey)\\s*\\\\?\\)\\s*\\}\\}/gi,\n      (_match, name) => encodeURIComponent(replacementValue(name, input)))\n    .replace(/\\{\\{\\s*(text|speakText|speed|speakSpeed|voiceKey)\\s*\\}\\}/gi,\n      (_match, name) => encode ? encodeURIComponent(replacementValue(name, input)) :\n        replacementValue(name, input))\n    .replace(/\\{(text|speakText|speed|speakSpeed|voiceKey)\\}/gi,\n      (_match, name) => encode ? encodeURIComponent(replacementValue(name, input)) :\n        replacementValue(name, input))\n    .replace(/\\$(?:\\{)?(text|speakText|speed|speakSpeed|voiceKey)(?:\\})?/gi,\n      (_match, name) => encode ? encodeURIComponent(replacementValue(name, input)) :\n        replacementValue(name, input));\n}\n\nfunction loadConfig() {\n  const value = reader.storage.get(CONFIG_KEY);\n  if (!value || typeof value !== 'object') return null;\n  return value;\n}\n\nmodule.exports.ttsVoices = async function () {\n  const config = loadConfig();\n  return [{\n    voiceKey: text(config && config.voiceKey) || 'default',\n    name: text(config && config.voiceName) || 'TTS 模板音色',\n    locale: text(config && config.locale) || 'zh-CN',\n    description: config ? '已配置网络接口' : '请先打开插件页面配置接口'\n  }];\n};\n\nmodule.exports.ttsSynthesize = async function (input) {\n  const config = loadConfig();\n  if (!config || !/^https?:\\/\\//i.test(text(config.url))) {\n    throw new Error('请先打开插件页面配置 TTS 接口');\n  }\n  const rawHeaders = config.headers && typeof config.headers === 'object' ? config.headers : {};\n  const headers = {};\n  Object.keys(rawHeaders).forEach((name) => {\n    headers[name] = replace(String(rawHeaders[name]), input, false);\n  });\n  return {\n    url: replace(config.url, input, true),\n    method: text(config.method).toUpperCase() || 'GET',\n    headers,\n    body: replace(config.body, input, false),\n    contentType: text(config.contentType) || 'audio/mpeg',\n    cacheKey: `${input.voiceKey}:${input.speed}:${input.text}`\n  };\n};\n",
+  "modules": {
+    "manage.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <title>TTS 模板配置</title>\n  <style>\n    :root { color-scheme: light dark; font-family: sans-serif; }\n    body { margin: 0; padding: 18px; background: #f6f7f8; color: #24312b; }\n    main { max-width: 720px; margin: 0 auto; }\n    h1 { font-size: 22px; margin: 0 0 8px; }\n    p { color: #69736e; line-height: 1.6; }\n    label { display: block; margin: 14px 0 6px; font-weight: 600; }\n    input, select, textarea { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #d9dfdc; border-radius: 12px; background: #fff; color: #24312b; font: inherit; }\n    textarea { min-height: 92px; resize: vertical; }\n    button { width: 100%; margin-top: 18px; padding: 13px; border: 0; border-radius: 22px; background: #1688ee; color: #fff; font-size: 16px; font-weight: 700; }\n    #status { min-height: 24px; margin-top: 12px; color: #1688ee; }\n    code { overflow-wrap: anywhere; }\n  </style>\n</head>\n<body>\n<main>\n  <h1>TTS 模板配置</h1>\n  <p>模板变量：<code>{{text}}</code>、<code>{{speakText}}</code>、<code>{{speed}}</code>、<code>{{voiceKey}}</code>。兼容阅读式 <code>{{java.encodeURI(speakText)}}</code>；URL 中的普通文字变量会自动编码，正文和请求头保留原文。</p>\n  <label for=\"voiceName\">音色名称</label>\n  <input id=\"voiceName\" value=\"TTS 模板音色\">\n  <label for=\"voiceKey\">音色标识</label>\n  <input id=\"voiceKey\" value=\"default\">\n  <label for=\"locale\">语言</label>\n  <input id=\"locale\" value=\"zh-CN\">\n  <label for=\"url\">请求 URL</label>\n  <input id=\"url\" placeholder=\"https://example.com/tts?text={{text}}\">\n  <label for=\"method\">请求方法</label>\n  <select id=\"method\"><option>GET</option><option>POST</option><option>PUT</option></select>\n  <label for=\"headers\">请求头 JSON</label>\n  <textarea id=\"headers\">{}</textarea>\n  <label for=\"body\">请求正文</label>\n  <textarea id=\"body\" placeholder='{\"text\":\"{{text}}\",\"speed\":{{speed}}}'></textarea>\n  <label for=\"contentType\">音频类型</label>\n  <input id=\"contentType\" value=\"audio/mpeg\" placeholder=\"例如 audio/mpeg 或 audio/wav\">\n  <button id=\"save\">保存并授权域名</button>\n  <div id=\"status\"></div>\n</main>\n<script>\n  const CONFIG_KEY = 'tts.config';\n  const fields = ['voiceName', 'voiceKey', 'locale', 'url', 'method', 'headers', 'body', 'contentType'];\n  const status = document.getElementById('status');\n\n  async function load() {\n    await FishReader.ready;\n    const saved = await FishReader.storage.get(CONFIG_KEY);\n    if (!saved || typeof saved !== 'object') return;\n    fields.forEach((name) => {\n      if (name === 'headers') document.getElementById(name).value = JSON.stringify(saved[name] || {}, null, 2);\n      else if (saved[name] !== undefined) document.getElementById(name).value = String(saved[name]);\n    });\n  }\n\n  document.getElementById('save').addEventListener('click', async () => {\n    try {\n      const target = new URL(document.getElementById('url').value.trim());\n      if (target.protocol !== 'https:' && target.protocol !== 'http:') throw new Error('URL 只支持 HTTP(S)');\n      const config = {};\n      fields.forEach((name) => { config[name] = document.getElementById(name).value.trim(); });\n      config.headers = JSON.parse(config.headers || '{}');\n      await FishReader.plugin.requestNetworkDomains([target.hostname]);\n      await FishReader.storage.set(CONFIG_KEY, config);\n      status.textContent = '已保存。返回阅读设置后重新打开音源列表。';\n    } catch (error) {\n      status.textContent = `保存失败：${error.message || error}`;\n    }\n  });\n\n  load().catch((error) => { status.textContent = `读取失败：${error.message || error}`; });\n</script>\n</body>\n</html>\n"
+  }
+}

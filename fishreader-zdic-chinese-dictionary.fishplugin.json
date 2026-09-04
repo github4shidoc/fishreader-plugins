@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "org.fishreader.dictionary.zdic.chinese",
+    "name": "汉典中文辞典",
+    "version": "1.0.0",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": [
+      "dictionary"
+    ],
+    "entryModule": "main.js",
+    "entrypoints": [
+      "dictionary"
+    ],
+    "permissions": {
+      "networkDomains": [
+        "zdic.net"
+      ],
+      "redirectDomains": [],
+      "cookieScope": false,
+      "pluginStorage": false,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "在线查询汉典，提供汉字和中文词语的拼音与释义。"
+  },
+  "source": "'use strict';\n\nfunction decodeHtml(value) {\n  const named = {\n    amp: '&', lt: '<', gt: '>', quot: '\"', apos: \"'\", nbsp: ' ',\n    middot: '·', ndash: '–', mdash: '—'\n  };\n  return String(value || '')\n    .replace(/&#(x[0-9a-f]+|[0-9]+);?/gi, function (_, code) {\n      const number = code.charAt(0).toLowerCase() === 'x' ?\n        parseInt(code.slice(1), 16) : parseInt(code, 10);\n      if (!Number.isFinite(number) || number < 0 || number > 0x10ffff) return '';\n      try { return String.fromCodePoint(number); } catch (_) { return ''; }\n    })\n    .replace(/&([a-z]+);/gi, function (match, name) {\n      return Object.prototype.hasOwnProperty.call(named, name.toLowerCase()) ?\n        named[name.toLowerCase()] : match;\n    });\n}\n\nfunction plainText(value) {\n  return decodeHtml(String(value || '')\n    .replace(/<br\\s*\\/?>/gi, '\\n')\n    .replace(/<\\/?[a-z][a-z0-9]*(?:\\s[^>]*)?>/gi, ' '))\n    .replace(/[\\t\\r\\n ]+/g, ' ')\n    .replace(/([“‘（【《〈])\\s+/g, '$1')\n    .replace(/\\s+([”’）】》〉，。！？；：、])/g, '$1')\n    .trim();\n}\n\nfunction normalizeTerm(value) {\n  const selected = String(value || '').trim()\n    .replace(/^[\\s\"'“”‘’《》〈〉【】\\[\\]（）()，。！？、；：]+/, '')\n    .replace(/[\\s\"'“”‘’《》〈〉【】\\[\\]（）()，。！？、；：]+$/, '');\n  return selected.slice(0, 64);\n}\n\nfunction collectMatches(html, className, limit) {\n  const values = [];\n  const pattern = new RegExp(\"<([a-z0-9]+)[^>]+class=[\\\"'][^\\\"']*\" + className +\n    \"[^\\\"']*[\\\"'][^>]*>([\\\\s\\\\S]*?)<\\\\/\\\\1>\", 'gi');\n  let match;\n  while ((match = pattern.exec(html)) && values.length < limit) {\n    const text = plainText(match[2]).slice(0, 12000);\n    if (text && values.indexOf(text) < 0) values.push(text);\n  }\n  return values;\n}\n\nfunction structuredFallback(html) {\n  const match = html.match(/<script[^>]+type=[\"']application\\/ld\\+json[\"'][^>]*>([\\s\\S]*?)<\\/script>/i);\n  if (!match) return { name: '', description: '' };\n  try {\n    const data = JSON.parse(match[1]);\n    return {\n      name: plainText(data && data.name),\n      description: plainText(data && data.description)\n    };\n  } catch (_) {\n    return { name: '', description: '' };\n  }\n}\n\nmodule.exports.dictionary = async function (input) {\n  const value = input || {};\n  const term = normalizeTerm(value.word || value.context);\n  if (!term) return { title: '汉典中文辞典', text: '请选择要查询的汉字或中文词语。' };\n  if (term.length > 32) {\n    return { title: term + ' · 汉典中文辞典', text: '选择内容过长，请缩小到一个汉字或词语后再查询。' };\n  }\n\n  try {\n    const response = await Promise.resolve(reader.http.fetch({\n      url: 'https://zdic.net/hans/' + encodeURIComponent(term),\n      method: 'GET',\n      headers: {\n        'Accept': 'text/html,application/xhtml+xml',\n        'Accept-Language': 'zh-CN,zh;q=0.9',\n        'User-Agent': 'Mozilla/5.0 FishReaderDictionary/1.0'\n      },\n      timeoutMs: 15000\n    }));\n    const status = Number(response && response.status || 0);\n    const html = String(response && response.body || '');\n    if (status === 404) {\n      return { title: term + ' · 汉典中文辞典', text: '暂未收录该词条。' };\n    }\n    if (status < 200 || status >= 400 || !html) {\n      return { title: term + ' · 汉典中文辞典', text: '查询失败：HTTP ' + status + '。' };\n    }\n\n    const pinyin = collectMatches(html, '(?:xxjs|jbjs)-reading__py', 4);\n    let definitions = collectMatches(html, '(?:xxjs|jbjs)-item__def', 12);\n    const nationalDefinitions = collectMatches(html, 'gy-sense__def', 4);\n    nationalDefinitions.forEach(function (item) {\n      if (definitions.indexOf(item) < 0 && definitions.length < 12) definitions.push(item);\n    });\n    const fallback = structuredFallback(html);\n    if (definitions.length === 0 && fallback.description) definitions = [fallback.description];\n    if (definitions.length === 0) {\n      return { title: term + ' · 汉典中文辞典', text: '暂未找到可显示的释义。' };\n    }\n\n    const lines = [];\n    if (pinyin.length > 0) lines.push('拼音：' + pinyin.join('；'));\n    if (lines.length > 0) lines.push('');\n    definitions.forEach(function (definition, index) {\n      lines.push(String(index + 1) + '. ' + definition);\n    });\n    lines.push('', '数据：汉典（在线查询）');\n    return { title: (fallback.name || term) + ' · 汉典中文辞典', text: lines.join('\\n') };\n  } catch (error) {\n    const message = (error && error.message ? String(error.message) :\n      String(error || '未知错误')).slice(0, 500);\n    return { title: term + ' · 汉典中文辞典', text: '查询失败：' + message };\n  }\n};\n"
+}

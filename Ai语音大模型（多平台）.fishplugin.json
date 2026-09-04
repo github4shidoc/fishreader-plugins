@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "org.fishreader.tts.aitts-multi",
+    "name": "鱼书 AI 语音大模型(多平台)",
+    "version": "1.2.0",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": [
+      "tts"
+    ],
+    "entryModule": "main.js",
+    "managementModule": "manage.html",
+    "entrypoints": [
+      "ttsVoices",
+      "ttsSynthesize",
+      "ui"
+    ],
+    "permissions": {
+      "networkDomains": [
+        "api.openai.com",
+        "api.siliconflow.cn",
+        "dashscope.aliyuncs.com"
+      ],
+      "redirectDomains": [],
+      "cookieScope": false,
+      "pluginStorage": true,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "鱼书 AI 语音大模型：内置 OpenAI / 硅基流动 / 阿里百炼(DashScope) / 自定义。登录平台拿 API Key 填一次即可朗读。仅接入返回音频流的 OpenAI 兼容 /audio/speech 平台（讯飞/百度/火山豆包为 base64，宿主播不了）。"
+  },
+  "source": "'use strict';\n/* 鱼书 AI 语音大模型 · 多平台模板版\n * 平台预设: OpenAI / 硅基流动(SiliconFlow) / 自定义。登录平台拿 Key，填一次即可。\n */\nconst CFG_KEY='aitts.config';\nconst PLATFORMS={\n  openai:{name:'OpenAI', url:'https://api.openai.com/v1/audio/speech', model:'tts-1', voices:['alloy','echo','fable','onyx','nova','shimmer']},\n  silicon:{name:'硅基流动(SiliconFlow)', url:'https://api.siliconflow.cn/v1/audio/speech', model:'FunAudioLLM/SenseVoiceSmall', voices:['FunAudioLLM/SenseVoiceSmall']},\n  aliyun:{name:'阿里百炼(DashScope)', url:'https://dashscope.aliyuncs.com/compatible-mode/v1/audio/speech', model:'qwen-audio-3.0-tts-flash', voices:['qwen-audio-3.0-tts-flash','cosyvoice-v3-flash']},\n  custom:{name:'自定义', url:'', model:'tts-1', voices:['alloy']}\n};\nfunction text(v){ return v===undefined||v===null?'':String(v); }\nfunction getCfg(){ try{ const c=reader.storage.get(CFG_KEY); return (c&&typeof c==='object')?c:{platform:'openai'}; }catch(_){ return {platform:'openai'}; } }\nfunction plat(c){ var p=c.platform||'openai'; return PLATFORMS[p]||PLATFORMS.openai; }\nmodule.exports.ttsVoices=async function(){ var c=getCfg(); var p=plat(c); var vs=(Array.isArray(c.voices)&&c.voices.length?c.voices:p.voices);\n  return vs.map(function(v,i){ return { voiceKey:String(v), name:('AI · '+String(v)), locale:'zh-CN', gender:(i%2===0?'female':'male'), description:p.name+' 在线语音' }; }); };\nmodule.exports.ttsSynthesize=async function(input){ var c=getCfg(); var p=plat(c); var url=text(c.url||p.url), key=text(c.apiKey), model=text(c.model||p.model);\n  if(!/^https?:\\/\\//i.test(url)) throw new Error('请先在插件页选平台并填服务地址');\n  if(!key) throw new Error('请先在插件页填入该平台的 API Key（登录平台控制台获取）');\n  var t=text(input&&input.text); if(!t.trim()) throw new Error('朗读文本为空');\n  var v=text(input&&input.voiceKey)||'alloy'; var sp=Math.max(0.25,Math.min(2,Number(input&&input.speed)||1));\n  return { url:url, method:'POST',\n    headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+key },\n    body:JSON.stringify({ model:model, input:t, voice:v, response_format:'mp3', speed:sp }),\n    contentType:'audio/mpeg',\n    cacheKey:'aitts:'+model+':'+v+':'+String(sp)+':'+(t.length>64?t.slice(0,64):t) };\n};\nmodule.exports.ui=async function(){ return { schemaVersion:1 }; };\nmodule.exports.manage=async function(input){ var a=input&&input.action;\n  if(a==='getConfig') return getCfg();\n  if(a==='platforms') return Object.keys(PLATFORMS).map(function(k){ return {key:k,name:PLATFORMS[k].name,url:PLATFORMS[k].url,model:PLATFORMS[k].model}; });\n  if(a==='saveConfig'){ var c=input.config||{}; reader.storage.set(CFG_KEY,{platform:c.platform||'openai',url:text(c.url),apiKey:text(c.apiKey),model:text(c.model),voices:Array.isArray(c.voices)&&c.voices.length?c.voices:[]}); return { ok:true }; }\n  return { schemaVersion:1 };\n};\n",
+  "modules": {
+    "manage.html": "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>AI 语音大模型</title><style>\n:root{color-scheme:light dark;font-family:system-ui,sans-serif}body{margin:0;padding:18px;background:#f6f7f8;color:#202124}main{max-width:560px;margin:0 auto}h1{font-size:20px;text-align:center;margin:0 0 8px}p{color:#5f6368;font-size:13px;line-height:1.6}\nlabel{display:block;font-size:13px;color:#5f6368;margin:12px 0 6px}input,select{box-sizing:border-box;width:100%;border:1px solid #dde1e6;border-radius:10px;padding:10px;font-size:14px}\nbutton{width:100%;height:44px;border:0;border-radius:22px;background:#1a73e8;color:#fff;font-size:15px;font-weight:600;margin-top:10px}\n#status{min-height:20px;margin-top:10px;color:#1a73e8;font-size:13px;white-space:pre-wrap}</style></head><body><main>\n<h1>AI 语音大模型</h1>\n<p>选择一个平台 → <b>登录该平台控制台</b>建语音应用 → 复制 <code>API Key</code> 粘贴到下面，保存即可。之后鱼书朗读时选「AI 音色」。</p>\n<label>平台</label><select id=\"pf\"></select>\n<label>服务地址</label><input id=\"url\" placeholder=\"自动填充，可改\">\n<label>API Key</label><input id=\"key\" type=\"password\" placeholder=\"sk-...\">\n<label>模型</label><input id=\"model\" placeholder=\"tts-1\">\n<label>音色（逗号分隔）</label><input id=\"voices\" placeholder=\"alloy,echo\">\n<button id=\"save\">保存</button>\n<div id=\"status\"></div>\n</main><script>\n'use strict';\nvar KEY=\"aitts.config\";\nvar PLATFORMS=[{\"key\":\"openai\",\"name\":\"OpenAI\",\"url\":\"https://api.openai.com/v1/audio/speech\",\"model\":\"tts-1\",\"voices\":\"alloy,echo,fable,onyx,nova,shimmer\"},{\"key\":\"silicon\",\"name\":\"硅基流动 (SiliconFlow)\",\"url\":\"https://api.siliconflow.cn/v1/audio/speech\",\"model\":\"FunAudioLLM/CosyVoice2-0.5B\",\"voices\":\"FunAudioLLM/CosyVoice2-0.5B\"},{\"key\":\"aliyun\",\"name\":\"阿里百炼 DashScope\",\"url\":\"https://dashscope.aliyuncs.com/compatible-mode/v1/audio/speech\",\"model\":\"qwen-audio-3.0-tts-flash\",\"voices\":\"qwen-audio-3.0-tts-flash\"},{\"key\":\"custom\",\"name\":\"自定义\",\"url\":\"\",\"model\":\"tts-1\",\"voices\":\"alloy\"}];\nvar $=function(id){return document.getElementById(id);};\nvar st=function(m,b){$('status').textContent=String(m);$('status').style.color=b?'#b04a3e':'#1a73e8';};\nfunction fill(){var k=$('pf').value;var p=PLATFORMS.find(function(x){return x.key===k;})||PLATFORMS[0];$('url').value=p.url;$('model').value=p.model;$('voices').value=p.voices;}\n(async function(){ try{ await FishReader.ready; var sel=$('pf'); sel.innerHTML=''; PLATFORMS.forEach(function(p){ var o=document.createElement('option'); o.value=p.key; o.textContent=p.name; sel.appendChild(o); });\n  var c=(await FishReader.storage.get(KEY))||{}; sel.value=c.platform||'openai'; fill(); $('key').value=c.apiKey||''; if(c.model)$('model').value=c.model; if(c.url)$('url').value=c.url; if(c.voices&&c.voices.length)$('voices').value=c.voices.join(','); }catch(e){ st('加载失败:'+(e&&e.message||e),true); } })();\n$('pf').onchange=fill;\n$('save').onclick=async function(){ try{ await FishReader.ready;\n  var cfg={ platform:$('pf').value, url:$('url').value.trim(), apiKey:$('key').value.trim(), model:$('model').value.trim(), voices:$('voices').value.split(',').map(function(x){return x.trim();}).filter(Boolean) };\n  await FishReader.storage.set(KEY, cfg); st('已保存。回到阅读页朗读，选「AI 音色」即可。'); }catch(e){ st('保存失败:'+(e&&e.message||e),true); } };\n</script></body></html>"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "manifest": {
+    "schemaVersion": 1,
+    "pluginId": "ai.tcm.dict.v3.032",
+    "name": "AI中医辞典-百科版",
+    "version": "3.3.2",
+    "sdkVersion": "1.0",
+    "sourceFormat": "fishreader-js",
+    "pluginKinds": ["dictionary"],
+    "entryModule": "main.js",
+    "entrypoints": ["dictionary"],
+    "permissions": {
+      "networkDomains": ["baike.baidu.com"],
+      "redirectDomains": [],
+      "cookieScope": false,
+      "pluginStorage": false,
+      "pluginDatabase": false,
+      "standardCrypto": false,
+      "htmlParse": false,
+      "webViewAutomation": false,
+      "loginBrowser": false
+    },
+    "description": "划词查询中医名词，调用百度百科获取释义，【仅供学习，不作医疗诊断依据】"
+  },
+  "source": "'use strict';\n\nfunction normalizeTerm(value) {\n  const selected = String(value || '').trim()\n    .replace(/^[\\s\"'\"\"''《》〈〉【】\\[\\]（）()，。！？、；：;:,]+/, '')\n    .replace(/[\\s\"'\"\"''《》〈〉【】\\[\\]（）()，。！？、；：;:,]+$/, '');\n  return selected.slice(0, 64);\n}\n\nmodule.exports.dictionary = async function (input) {\n  const value = input || {};\n  const term = normalizeTerm(value.word || value.context);\n  if (!term) {\n    return { title: 'AI中医辞典', text: '请选中需要查询的中医词语。' };\n  }\n  if (term.length > 32) {\n    return { title: term + ' · AI中医辞典', text: '选中内容过长，请选择单个中医术语。' };\n  }\n\n  try {\n    const baikeUrl = \"https://baike.baidu.com/api/openapi/BaikeLemmaCardApi?scope=103&format=json&appid=379020&bk_key=\" + encodeURIComponent(term) + \"&bk_length=600\";\n\n    const response = await reader.http.fetch({\n      url: baikeUrl,\n      method: \"GET\",\n      timeoutMs: 15000\n    });\n\n    const status = Number(response && response.status || 0);\n    const bodyText = String(response && response.body || \"\");\n\n    if (status < 200 || status >= 400) {\n      return {\n        title: term + ' · AI中医辞典',\n        text: \"百度百科接口请求失败 HTTP: \" + status + \"\\n返回：\" + bodyText.slice(0, 400)\n      };\n    }\n\n    let data;\n    try {\n      data = JSON.parse(bodyText);\n    } catch (_e) {\n      return {\n        title: term + ' · AI中医辞典',\n        text: \"百度百科返回非 JSON：\" + bodyText.slice(0, 500)\n      };\n    }\n\n    let output = \"\";\n    let found = false;\n\n    if (data) {\n      const keys = Object.keys(data);\n      for (let i = 0; i < keys.length; i++) {\n        const k = keys[i];\n        const v = data[k];\n        if (k === \"key\" || k === \"card\") {\n          if (v && typeof v === \"object\") {\n            if (v.name || v.key) {\n              output += \"【词条】\" + (v.name || v.key) + \"\\n\\n\";\n              found = true;\n            }\n            if (v.abs || v.abstract || v.desc) {\n              output += \"【释义】\\n\" + (v.abs || v.abstract || v.desc) + \"\\n\\n\";\n              found = true;\n            }\n            if (v.url) {\n              output += \"【来源】\" + v.url + \"\\n\";\n            }\n          }\n        }\n        if (k === \"abstract\" || k === \"abs\" || k === \"desc\") {\n          if (v && typeof v === \"string\" && v.length > 10) {\n            output += \"【释义】\\n\" + v + \"\\n\\n\";\n            found = true;\n          }\n        }\n        if (k === \"url\") {\n          output += \"【来源】\" + v + \"\\n\";\n        }\n      }\n    }\n\n    if (!found) {\n      return {\n        title: term + \" · AI中医辞典\",\n        text: \"未找到「\" + term + \"」的百科释义。\\n\\n\" +\n              \"可能原因：\\n\" +\n              \"• 该词条尚未被百度百科收录\\n\" +\n              \"• 词条名称不够规范\\n\\n\" +\n              \"建议尝试更通用的说法，例如：\\n\" +\n              \"• 「四诊」而非「四诊法」\\n\" +\n              \"• 「当归」而非「当归功效」\\n\\n\" +\n              \"⚠ 内容仅供学习，不作为医疗诊断依据\"\n      };\n    }\n\n    output += \"\\n⚠ 内容来自百度百科，仅供学习，不作为医疗诊断依据\";\n\n    return {\n      title: term + \" · AI中医辞典\",\n      text: output\n    };\n\n  } catch (error) {\n    const message = (error && error.message ? String(error.message) : String(error || \"未知错误\")).slice(0, 500);\n    return {\n      title: term + ' · AI中医辞典',\n      text: \"查询异常：\" + message + \"\\n\\n提示：请检查网络连接。\"\n    };\n  }\n};"
+}
